@@ -1,0 +1,24 @@
+{
+  "name": "vuoo-bot-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "description": "VUOO Bot: the companion's animated head, built with robot-heads' 3D canvas engine.",
+  "scripts": {
+    "dev": "vite --config vuoo-bot/vite.config.ts",
+    "build": "vite build --config vuoo-bot/vite.config.ts",
+    "typecheck": "tsc --noEmit -p vuoo-bot/tsconfig.json"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.11"
+  }
+}
