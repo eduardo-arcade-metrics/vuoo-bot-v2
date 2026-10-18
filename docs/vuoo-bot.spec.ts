@@ -104,7 +104,7 @@ export const TRANSITION = { blinkSwap: 0.24, easeRate: 9, colorSeconds: 0.3 } as
 export type VuooState =
   // estados de base
   | "ocioso" | "atento" | "pensando" | "encorajar" | "descansar"
-  | "buscar" | "falar" | "trabalhar" | "erro" | "acerto" | "orbita" | "brincar" | "pergunta"
+  | "buscar" | "falar" | "trabalhar" | "erro" | "acerto" | "orbita" | "brincar" | "pergunta" | "orbitaExpandida" | "chamarFaiscas"
   // comportamentos adaptativos (projeto, F3.1)
   | "espelhar" | "provocar" | "celebrar" | "euforia" | "recuar";
 
@@ -363,6 +363,32 @@ export const STATES: Record<VuooState, StateSpec> = {
       completo: "Explode de alegria: bolinhas de confete voam para todos os lados, com pulinhos.",
       reduzido: "Rosto feliz e balanço leve, sem confete.",
       minimo:   "Rosto feliz e sorriso fixos.",
+    },
+  },
+  orbitaExpandida: {
+    label: "Órbita expandida", group: "adaptativo", robotHeads: null,
+    description: "O átomo e as faíscas giram num anel bem maior, que passa além da caixa do bot.",
+    face: { eyes: "ring", eyeScale: 1, mouth: null, extra: null },
+    pose: { pitch: -0.1, gazeY: -0.5 },
+    motion: "anel 1,75× maior que o da Órbita; o átomo e as faíscas giram por toda a tela, desenhados na camada da página.",
+    orbit: { glow: "#FFB24A", alpha: 0.6, behavior: "gira num anel amplo, além da caixa" },
+    profiles: {
+      completo: "O átomo e as faíscas giram num anel bem maior, além do bot.",
+      reduzido: "Anel maior, com giro devagar.",
+      minimo:   "Átomo e faíscas paradas num anel maior.",
+    },
+  },
+  chamarFaiscas: {
+    label: "Chamar faíscas", group: "adaptativo", robotHeads: null,
+    description: "As faíscas saem do logo, no canto, voam até o bot e giram em volta dele.",
+    face: { eyes: "ring", eyeScale: 1, mouth: "smile", extra: null },
+    pose: { roll: -0.04, gazeY: -0.3 },
+    motion: "as faíscas saem do logo, voam até o anel, giram e voltam ao logo; ciclo de 5,5 s, na camada da página.",
+    orbit: { glow: "#FFD34D", alpha: 0.75, behavior: "faíscas voam do logo" },
+    profiles: {
+      completo: "Chama as faíscas do logo: elas voam, giram em volta do bot e voltam.",
+      reduzido: "As faíscas vêm do logo e giram devagar.",
+      minimo:   "Faíscas paradas em volta do bot.",
     },
   },
   recuar: {

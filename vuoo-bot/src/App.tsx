@@ -6,7 +6,7 @@ import './index.css';
 /* ?estado=pensando&movimento=minimo&paused for screenshots and links */
 const q = new URLSearchParams(location.search);
 
-const stateOrder: VuooState[] = ['ocioso', 'atento', 'pensando', 'encorajar', 'descansar', 'buscar', 'falar', 'trabalhar', 'erro', 'acerto', 'orbita', 'espelhar', 'provocar', 'celebrar', 'euforia', 'brincar', 'pergunta', 'recuar'];
+const stateOrder: VuooState[] = ['ocioso', 'atento', 'pensando', 'encorajar', 'descansar', 'buscar', 'falar', 'trabalhar', 'erro', 'acerto', 'orbita', 'orbitaExpandida', 'chamarFaiscas', 'espelhar', 'provocar', 'celebrar', 'euforia', 'brincar', 'pergunta', 'recuar'];
 const profiles: MotionProfile[] = ['completo', 'reduzido', 'minimo'];
 const profileLabels: Record<MotionProfile, string> = { completo: 'Completo', reduzido: 'Reduzido', minimo: 'Mínimo' };
 
@@ -258,7 +258,7 @@ function BrandMark() {
     return () => cancelAnimationFrame(raf);
   }, []);
   return (
-    <svg className="logo" viewBox="0 0 120 80" aria-hidden>
+    <svg className="logo" viewBox="0 0 120 80" aria-hidden data-spark-origin>
       <g ref={root}>
         <rect x="6" y="16" width="96" height="58" rx="27" fill="none" stroke="currentColor" strokeWidth="7" />
         <circle ref={atom} cx="111" cy="9" r="6" fill="currentColor" />

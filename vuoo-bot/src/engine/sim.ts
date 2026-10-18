@@ -30,6 +30,10 @@ const CROUCH = 0.11;
 const RING = { x: 0.85, y: 0.6 };
 /* the tilt of the ring toward the viewer */
 const RING_TILT = 0.9;
+/* the expanded ring is this many times the ring of "Órbita" */
+const EXPANDED = 1.75;
+/* the states whose atoms go round the head; their atoms draw on the page layer */
+const RINGED: VuooState[] = ['orbita', 'orbitaExpandida', 'chamarFaiscas'];
 
 /* one of the atoms in "órbita": its own ring, speed, wobble and timing, so no two cycles look alike */
 interface Orbiter {
@@ -117,6 +121,8 @@ export interface OrbitPose {
   behind: boolean;
   /* the copies of the atom in "órbita" */
   sats: Satellite[];
+  /* whether the atoms go on the page layer, which reaches past the bot's box */
+  overlay: boolean;
   /* the light it casts, and the sphere's own colours */
   glow: RGB;
   glowA: number;
@@ -144,6 +150,8 @@ export interface SimInput {
   effects: boolean;
   /* the pointer, relative to the head and already scaled to −1…1, or null */
   pointer: { dx: number; dy: number } | null;
+  /* where the logo is, in head units from the head's centre: where "Chamar faíscas" sends its sparks from */
+  origin?: { x: number; y: number } | null;
 }
 
 const kind = (e: EyeShape): EyeKind => (e === 'wink' ? 'happy' : e);
@@ -175,6 +183,7 @@ export class VuooSim {
   face: { spec: FaceSpec; params: FaceParams };
   confetti: Confetto[] = [];
   private orbitRun: OrbitRun | null = null;
+  private origin: { x: number; y: number } | null = null;
   private wander: { end: number; fx: number; fx2: number; fy: number; px: number; py: number; ampX: number; ampY: number } | null = null;
   /* where the guest atom is, eased toward its target so a new wander does not jump */
   private guestPos: { x: number; y: number } | null = null;
@@ -218,7 +227,7 @@ export class VuooSim {
     this.rand = rng(seed);
     this.nextBlink = 1 + seed * 3;
     this.nextHop = 6 + this.rand() * 6;
-    this.orbit = { x: 0, y: 0, k: 1, behind: false, sats: [], glow: [246, 240, 228], glowA: 0, base: [246, 240, 228], edge: [217, 207, 190] };
+    this.orbit = { x: 0, y: 0, k: 1, behind: false, sats: [], overlay: false, glow: [246, 240, 228], glowA: 0, base: [246, 240, 228], edge: [217, 207, 190] };
     this.face = { spec: this.baseFace(state), params: { lookX: 0, lookY: 0, open: 1, time: 0, amp: 1, seed } };
   }
 
@@ -357,6 +366,14 @@ export class VuooSim {
         T.yaw = st === 'brincar' ? (atom ? atom.x * 0.25 : 0) * a : 0;
         break;
       }
+      case 'chamarFaiscas':
+        /* the head and eyes turn toward the logo, up and to the left */
+        T.yaw = -0.12 * a;
+        T.pitch = -0.06;
+        T.gx = -0.5;
+        T.gy = -0.4;
+        break;
+      case 'orbitaExpandida':
       case 'orbita':
         /* the head tips up toward the copies, the eyes with it */
         T.yaw = 0.1 * Math.sin(t * 0.6) * a;
@@ -486,6 +503,7 @@ export class VuooSim {
       k: p.scale,
       behind: st === 'celebrar' && a === 1 && Math.sin(t * 3) < 0,
       sats: this.orbit.sats,
+      overlay: RINGED.includes(st),
       glow: this.glowCol,
       glowA,
       base: this.atomCol,
@@ -512,7 +530,7 @@ export class VuooSim {
   }
 
   /* a new, random cycle: the atoms (the original is the first) with their own rings and timings */
-  private newOrbitRun(a: number, now: number): OrbitRun {
+  private newOrbitRun(a: number, now: number, scale: number): OrbitRun {
     const r = this.rand;
     const n = a === 1 ? 8 : 6;
     const grow = 0.5 + r() * 0.8;
@@ -520,8 +538,8 @@ export class VuooSim {
     const orbiters: Orbiter[] = [];
     for (let i = 0; i < n; i++) {
       orbiters.push({
-        rx: RING.x * (0.7 + r() * 0.5),
-        ry: RING.y * (0.55 + r() * 0.7),
+        rx: scale * RING.x * (0.7 + r() * 0.5),
+        ry: scale * RING.y * (0.55 + r() * 0.7),
         tilt: 0.3 + r() * 1.1,
         speed: (0.6 + r() * 1.3) * a,
         phase: r() * Math.PI * 2,
@@ -598,20 +616,23 @@ export class VuooSim {
       this.orbitRun = null;
       return;
     }
-    if (this.state !== 'orbita') {
+    if (!RINGED.includes(this.state)) {
       this.orbitRun = null;
       this.orbit.sats = [];
       return;
     }
     if (!this.orbitRun || this.sinceChange - this.orbitRun.start >= this.orbitRun.end || a === 0 && !this.orbitRun.orbiters.length) {
-      this.orbitRun = this.newOrbitRun(a, this.sinceChange);
+      this.orbitRun = this.newOrbitRun(a, this.sinceChange, this.state === 'orbitaExpandida' ? EXPANDED : 1);
     }
     const run = this.orbitRun;
     const lc = this.sinceChange - run.start;
     const t = this.clock;
-    const ox = this.p.ox, oy = this.p.oy;
+    /* "Chamar faíscas": every spark leaves the logo, and the atom stays where it is */
+    const chamar = this.state === 'chamarFaiscas' && this.origin !== null;
+    const ox = chamar ? this.origin!.x : this.p.ox;
+    const oy = chamar ? this.origin!.y : this.p.oy;
     const sats: Satellite[] = [];
-    let mainX = ox, mainY = oy, mainZ = 0;
+    let mainX = this.p.ox, mainY = this.p.oy, mainZ = 0;
     run.orbiters.forEach((o, i) => {
       /* growth, a hold on the ring, then back in: each atom eases on its own */
       const tau = lc - o.delay;
@@ -627,7 +648,7 @@ export class VuooSim {
       const x = ox + (rx + jx - ox) * f;
       const y = oy + (ry * Math.cos(o.tilt) + jy - oy) * f;
       const z = ry * Math.sin(o.tilt) * f;
-      if (i === 0) {
+      if (i === 0 && !chamar) {
         mainX = x; mainY = y; mainZ = z;
       } else {
         /* identical atoms: the same size as the original, growing out of it */
@@ -707,6 +728,7 @@ export class VuooSim {
   /** Advance by `dt` seconds of animation clock (0 while paused). */
   update(dt: number, input: SimInput) {
     const a = input.amp;
+    this.origin = input.origin ?? null;
     const st = this.state;
     this.clock += dt;
     this.sinceChange += dt;

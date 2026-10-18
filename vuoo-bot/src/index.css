@@ -254,8 +254,12 @@ button:focus-visible, label:focus-within { outline: 1.5px solid var(--soft); out
 }
 
 /* the states always fit: three columns on shorter windows, and no scrollbar */
-@media (max-height: 760px) {
+@media (max-height: 1000px) {
   .states { grid-template-columns: repeat(3, 60px); }
 }
 .states { scrollbar-width: none; }
 .states::-webkit-scrollbar { display: none; }
+
+/* below the masthead, and names that wrap rather than run under the next one */
+.states { top: 96px; transform: none; max-height: calc(100vh - 116px); }
+.state-name { white-space: normal; line-height: 1.15; text-align: center; }

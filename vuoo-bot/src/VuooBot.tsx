@@ -6,6 +6,7 @@ import { pointer, subscribe } from '../../src/ticker';
 import { drawFace, switchOn } from './engine/faces';
 import { VuooRenderer, frameFor, type Palette } from './engine/render';
 import { VuooSim } from './engine/sim';
+import { clearLayer, setLayer, type Spark } from './engine/overlay';
 
 export interface VuooBotProps {
   /** What it is doing. Default `ocioso`. */
@@ -86,6 +87,8 @@ export const VuooBot = forwardRef<HTMLCanvasElement, VuooBotProps>(function Vuoo
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useImperativeHandle(ref, () => canvasRef.current as HTMLCanvasElement);
   const reactId = useId();
+  /* the atoms on the page layer go when the bot does */
+  useEffect(() => () => clearLayer(reactId), [reactId]);
   const state: VuooState = estado in STATES ? estado : 'ocioso';
   const seedValue = clamp(seed ?? hashSeed(reactId), 0, 1);
   const frozen = paused || !(speed > 0);
@@ -126,16 +129,38 @@ export const VuooBot = forwardRef<HTMLCanvasElement, VuooBotProps>(function Vuoo
     if (!renderer.current) renderer.current = new VuooRenderer();
     const s = sim.current!;
     const l = live.current;
-    s.update(dt, { amp: l.amp, effects: l.efeitos, atomo: colors.current.atomo, tela: colors.current.tela, pointer: pointerAt });
+    /* the head's centre on the page, and the logo's, in head units: the atoms that leave the box need both */
+    const cr = canvas.getBoundingClientRect();
+    const hx = cr.left + f.cx, hy = cr.top + f.cy;
+    let origin: { x: number; y: number } | null = null;
+    const logo = l.interactive ? document.querySelector<SVGElement>('[data-spark-origin]') : null;
+    if (logo) {
+      const lr = logo.getBoundingClientRect();
+      origin = { x: (lr.left + lr.width / 2 - hx) / f.unit, y: (lr.top + lr.height / 2 - hy) / f.unit };
+    }
+    s.update(dt, { amp: l.amp, effects: l.efeitos, atomo: colors.current.atomo, tela: colors.current.tela, pointer: pointerAt, origin });
     const compose = (g: Parameters<typeof drawFace>[0]) => {
       drawFace(g, s.face.spec, s.face.params);
       if (s.sinceChange < 0.55) switchOn(g, s.sinceChange, s.clock);
     };
+    const onPage = l.interactive && l.orbita && s.orbit.overlay;
     renderer.current.draw(ctx, f, dpr, s.pose, compose, s.orbit, s.confetti, s.led, pal.current, {
       floorShadow: l.floorShadow,
       effects: l.efeitos,
-      orbit: l.orbita,
+      orbit: l.orbita && !onPage,
     });
+    /* the atoms that go outside the box are drawn on the whole page, not in the bot's canvas */
+    if (onPage) {
+      const o = s.orbit;
+      const u = f.unit;
+      const at = (x: number, y: number, r: number, alpha: number): Spark => ({
+        x: hx + x * u, y: hy + y * u, r: 0.054 * u * r,
+        base: o.base, edge: o.edge, glow: o.glow, glowA: l.efeitos ? o.glowA : 0, alpha,
+      });
+      const sparks = [at(o.x, o.y, o.k, o.behind ? 0.6 : 1)];
+      for (const q of o.sats) sparks.push(at(q.x, q.y, o.k * q.k, q.z < 0 ? 0.6 : 1));
+      setLayer(reactId, sparks);
+    } else clearLayer(reactId);
   };
 
   useEffect(() => {
