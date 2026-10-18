@@ -31,7 +31,7 @@ const RING = { x: 0.85, y: 0.6 };
 /* the tilt of the ring toward the viewer */
 const RING_TILT = 0.9;
 /* the expanded ring is this many times the ring of "Órbita" */
-const EXPANDED = 1.75;
+const EXPANDED = 2.6;
 /* the states whose atoms go round the head; their atoms draw on the page layer */
 const RINGED: VuooState[] = ['orbita', 'orbitaExpandida', 'chamarFaiscas'];
 
@@ -627,13 +627,13 @@ export class VuooSim {
     const run = this.orbitRun;
     const lc = this.sinceChange - run.start;
     const t = this.clock;
-    /* "Chamar faíscas": every spark leaves the logo, and the atom stays where it is */
+    /* "Chamar as faíscas": the sparks leave the logo; the atom leaves its place too, and orbits with them */
     const chamar = this.state === 'chamarFaiscas' && this.origin !== null;
-    const ox = chamar ? this.origin!.x : this.p.ox;
-    const oy = chamar ? this.origin!.y : this.p.oy;
     const sats: Satellite[] = [];
     let mainX = this.p.ox, mainY = this.p.oy, mainZ = 0;
     run.orbiters.forEach((o, i) => {
+      const ox = chamar && i > 0 ? this.origin!.x : this.p.ox;
+      const oy = chamar && i > 0 ? this.origin!.y : this.p.oy;
       /* growth, a hold on the ring, then back in: each atom eases on its own */
       const tau = lc - o.delay;
       const grow = easeInOut(clamp(tau / run.grow, 0, 1));
@@ -648,7 +648,7 @@ export class VuooSim {
       const x = ox + (rx + jx - ox) * f;
       const y = oy + (ry * Math.cos(o.tilt) + jy - oy) * f;
       const z = ry * Math.sin(o.tilt) * f;
-      if (i === 0 && !chamar) {
+      if (i === 0) {
         mainX = x; mainY = y; mainZ = z;
       } else {
         /* identical atoms: the same size as the original, growing out of it */

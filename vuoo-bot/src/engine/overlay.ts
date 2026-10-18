@@ -40,7 +40,7 @@ function ensure() {
   canvas = document.createElement('canvas');
   Object.assign(canvas.style, {
     position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh',
-    pointerEvents: 'none', zIndex: '4',
+    pointerEvents: 'none', zIndex: '40',
   });
   canvas.setAttribute('aria-hidden', 'true');
   document.body.appendChild(canvas);

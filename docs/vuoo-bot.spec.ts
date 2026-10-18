@@ -379,7 +379,7 @@ export const STATES: Record<VuooState, StateSpec> = {
     },
   },
   chamarFaiscas: {
-    label: "Chamar faíscas", group: "adaptativo", robotHeads: null,
+    label: "Chamar as faíscas", group: "adaptativo", robotHeads: null,
     description: "As faíscas saem do logo, no canto, voam até o bot e giram em volta dele.",
     face: { eyes: "ring", eyeScale: 1, mouth: "smile", extra: null },
     pose: { roll: -0.04, gazeY: -0.3 },
