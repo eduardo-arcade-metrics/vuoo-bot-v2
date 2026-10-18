@@ -32,10 +32,14 @@ const RING = { x: 0.85, y: 0.6 };
 const RING_TILT = 0.9;
 /* the expanded ring is this many times the ring of "Órbita" */
 const EXPANDED = 2.6;
+/* leaving a ring: the atoms fly back before the next state's start */
+const EXIT = 0.6;
 /* the states whose atoms go round the head; their atoms draw on the page layer */
 const RINGED: VuooState[] = ['orbita', 'orbitaExpandida', 'chamarFaiscas'];
 /* the states that move like the idle, with their atoms on top of it */
 const IDLE_LIKE: VuooState[] = ['ocioso', 'orbita', 'orbitaExpandida', 'chamarFaiscas'];
+/* the states where the head turns sideways on purpose: the atom slides a little with it (never with the jumps' spins) */
+const YAW_FOLLOW: VuooState[] = ['buscar', 'pensando'];
 
 /* one of the atoms in "órbita": its own ring, speed, wobble and timing, so no two cycles look alike */
 interface Orbiter {
@@ -186,6 +190,15 @@ export class VuooSim {
   confetti: Confetto[] = [];
   private orbitRun: OrbitRun | null = null;
   private origin: { x: number; y: number } | null = null;
+  /* leaving a ring: where its atoms were, and where they go back to */
+  private exitFrom: { sats: Satellite[]; x: number; y: number; to: { x: number; y: number } } | null = null;
+  private exitT = 0;
+  /* a ring's own clock starts this long after the one it replaces */
+  private entryDelay = 0;
+  /* the atoms trail the head a little, as if held by a magnet: a light spring follows the head's sideways and vertical moves */
+  private lagX = new Spring();
+  private lagY = new Spring();
+  private lagInit = false;
   private wander: { end: number; fx: number; fx2: number; fy: number; px: number; py: number; ampX: number; ampY: number } | null = null;
   /* where the guest atom is, eased toward its target so a new wander does not jump */
   private guestPos: { x: number; y: number } | null = null;
@@ -235,6 +248,7 @@ export class VuooSim {
 
   setState(s: VuooState) {
     if (s === this.state) return;
+    const left = this.state;
     this.prev = this.state;
     this.state = s;
     this.trans = this.frozen ? -9 : this.clock;
@@ -242,6 +256,14 @@ export class VuooSim {
     this.nextHop = this.clock + 1 + this.rand() * 3;
     this.wantStateHop = true;
     this.nextBurst = 0;
+    /* the old ring's atoms are not carried into the new state: the orbit restarts, and leaving a ring goes back first */
+    this.orbitRun = null;
+    const wasRinged = RINGED.includes(left);
+    this.entryDelay = wasRinged ? EXIT : 0;
+    this.exitT = 0;
+    this.exitFrom = wasRinged
+      ? { sats: this.orbit.sats, x: this.orbit.x, y: this.orbit.y, to: left === 'chamarFaiscas' && this.origin ? this.origin : { x: this.p.ox, y: this.p.oy } }
+      : null;
     if (this.frozen) this.snap = true;
   }
 
@@ -505,7 +527,7 @@ export class VuooSim {
       k: p.scale,
       behind: st === 'celebrar' && a === 1 && Math.sin(t * 3) < 0,
       sats: this.orbit.sats,
-      overlay: RINGED.includes(st),
+      overlay: RINGED.includes(st) || this.exitFrom !== null,
       glow: this.glowCol,
       glowA,
       base: this.atomCol,
@@ -588,6 +610,19 @@ export class VuooSim {
 
   /* where each atom of the "órbita" is: the original (the first) leaves its place, the others come out of it */
   private placeOrbit(a: number, dt: number) {
+    /* leaving a ring: its atoms fly back to where they came from, and the new state waits for them */
+    if (this.exitFrom && this.exitT < EXIT) {
+      const e = easeInOut(clamp(this.exitT / EXIT, 0, 1));
+      const ex = this.exitFrom;
+      this.orbit.x = ex.x + (this.p.ox - ex.x) * e;
+      this.orbit.y = ex.y + (this.p.oy - ex.y) * e;
+      this.orbit.behind = false;
+      this.orbit.sats = ex.sats
+        .map((q) => ({ x: q.x + (ex.to.x - q.x) * e, y: q.y + (ex.to.y - q.y) * e, z: q.z * (1 - e), k: q.k * (1 - e) }))
+        .filter((q) => q.k > 0.01);
+      this.orbitRun = null;
+      return;
+    }
     const g = this.guestAtom(a);
     if (g) {
       /* the atom leaves its place and goes to where the state keeps it */
@@ -623,11 +658,20 @@ export class VuooSim {
       this.orbit.sats = [];
       return;
     }
-    if (!this.orbitRun || this.sinceChange - this.orbitRun.start >= this.orbitRun.end || a === 0 && !this.orbitRun.orbiters.length) {
-      this.orbitRun = this.newOrbitRun(a, this.sinceChange, this.state === 'orbitaExpandida' ? EXPANDED : 1);
+    /* the ring's own clock: it starts once the state it replaces has left */
+    const clock = this.sinceChange - this.entryDelay;
+    if (clock < 0) {
+      this.orbit.sats = [];
+      this.orbit.x = this.p.ox;
+      this.orbit.y = this.p.oy;
+      this.orbit.behind = false;
+      return;
+    }
+    if (!this.orbitRun || clock - this.orbitRun.start >= this.orbitRun.end || a === 0 && !this.orbitRun.orbiters.length) {
+      this.orbitRun = this.newOrbitRun(a, clock, this.state === 'orbitaExpandida' ? EXPANDED : 1);
     }
     const run = this.orbitRun;
-    const lc = this.sinceChange - run.start;
+    const lc = clock - run.start;
     const t = this.clock;
     /* "Chamar as faíscas": the sparks leave the logo; the atom leaves its place too, and orbits with them */
     const chamar = this.state === 'chamarFaiscas' && this.origin !== null;
@@ -734,6 +778,7 @@ export class VuooSim {
     const st = this.state;
     this.clock += dt;
     this.sinceChange += dt;
+    this.exitT += dt;
     const t = this.clock;
     const rand = this.rand;
 
@@ -799,7 +844,27 @@ export class VuooSim {
     };
     this.composeFace(t, a);
     this.composeOrbit(t, a, dt, input.atomo);
+    if (this.exitFrom && this.exitT >= EXIT) this.exitFrom = null;
     this.placeOrbit(a, dt);
+    if (!this.lagInit) {
+      this.lagX.x = this.pose.x;
+      this.lagY.x = this.pose.lift;
+      this.lagInit = true;
+    }
+    const lagSteps = Math.max(1, Math.ceil(dt * 120));
+    for (let i = 0; i < lagSteps; i++) {
+      this.lagX.step(this.pose.x, dt / lagSteps, 4.5, 0.32);
+      this.lagY.step(this.pose.lift, dt / lagSteps, 4.5, 0.32);
+    }
+    /* how far behind the head the atoms are, a fraction of it: discreet, and it overshoots a little when the head stops */
+    const yawShift = YAW_FOLLOW.includes(this.state) ? Math.sin(this.p.yaw) * 0.15 * a : 0;
+    const lx = (this.lagX.x - this.pose.x) * 0.6 * a + yawShift;
+    const ly = -(this.lagY.x - this.pose.lift) * 0.6 * a;
+    if (lx || ly) {
+      this.orbit.x += lx;
+      this.orbit.y += ly;
+      this.orbit.sats = this.orbit.sats.map((q) => ({ ...q, x: q.x + lx, y: q.y + ly }));
+    }
     if (st === 'euforia' && a === 1 && input.effects && this.sinceChange > this.nextBurst) {
       this.nextBurst = this.sinceChange + 1.1;
       this.burst(this.orbit.x, this.orbit.y);
