@@ -34,6 +34,8 @@ const RING_TILT = 0.9;
 const EXPANDED = 2.6;
 /* the states whose atoms go round the head; their atoms draw on the page layer */
 const RINGED: VuooState[] = ['orbita', 'orbitaExpandida', 'chamarFaiscas'];
+/* the states that move like the idle, with their atoms on top of it */
+const IDLE_LIKE: VuooState[] = ['ocioso', 'orbita', 'orbitaExpandida', 'chamarFaiscas'];
 
 /* one of the atoms in "órbita": its own ring, speed, wobble and timing, so no two cycles look alike */
 interface Orbiter {
@@ -266,7 +268,7 @@ export class VuooSim {
     const bob = Math.sin(t * 1.7 + sd);
     const ptr = input.pointer;
     const dx = ptr ? ptr.dx : 0, dy = ptr ? ptr.dy : 0;
-    switch (st) {
+    switch (IDLE_LIKE.includes(st) ? 'ocioso' : st) {
       case 'ocioso': {
         const gl = this.glance;
         T.yaw = (0.08 * Math.sin(t * 0.5 + sd) + gl.yaw) * a;
@@ -458,7 +460,7 @@ export class VuooSim {
       spec.left = spec.right = 'happy';
       spec.mouth = 'big';
     }
-    const canBlink = a > 0 && ['ocioso', 'atento', 'espelhar', 'provocar', 'encorajar', 'pensando', 'buscar', 'falar', 'trabalhar'].includes(st);
+    const canBlink = a > 0 && ['ocioso', 'atento', 'espelhar', 'provocar', 'encorajar', 'pensando', 'buscar', 'falar', 'trabalhar', 'orbita', 'orbitaExpandida', 'chamarFaiscas'].includes(st);
     if (canBlink && t > this.nextBlink) {
       this.blinkAt = t;
       this.nextBlink = t + 2.4 + ((((Math.sin(t * 12.9898 + this.seed * 78.2) * 43758.5) % 1) + 1) % 1) * 3.2;
@@ -533,7 +535,7 @@ export class VuooSim {
   private newOrbitRun(a: number, now: number, scale: number): OrbitRun {
     const r = this.rand;
     const n = a === 1 ? 8 : 6;
-    const grow = 0.5 + r() * 0.8;
+    const grow = 0.3 + r() * 0.35;
     const hold = 2.5 + r() * 3;
     const orbiters: Orbiter[] = [];
     for (let i = 0; i < n; i++) {
@@ -545,7 +547,7 @@ export class VuooSim {
         phase: r() * Math.PI * 2,
         wobF: 1.5 + r() * 3.5,
         wobA: 0.05 + r() * 0.15,
-        delay: i === 0 ? 0 : r() * 0.4,
+        delay: i === 0 ? 0 : r() * 0.12,
         back: i === 0 ? 0 : r() * 0.4,
       });
     }
@@ -740,14 +742,14 @@ export class VuooSim {
       this.side = -this.side;
       this.nextSide = t + 3.5;
     }
-    if (st === 'ocioso' && a > 0 && t > this.nextGlance) {
+    if (IDLE_LIKE.includes(st) && a > 0 && t > this.nextGlance) {
       const yaw = (rand() - 0.5) * 0.75;
       const cells = clamp(Math.round(yaw * 5), -2, 2);
       this.glance = { yaw, pitch: (rand() - 0.5) * 0.24, gx: cells / 3.2, gy: (rand() < 0.3 ? -1 : rand() < 0.2 ? 1 : 0) / 2 };
       this.nextGlance = t + 1.4 + rand() * 2.6;
     }
     if (a === 1 && !this.jump && t > this.nextHop) {
-      if (st === 'ocioso') {
+      if (IDLE_LIKE.includes(st)) {
         this.hop(0.15 + rand() * 0.07, rand() < 0.35 ? (rand() < 0.5 ? 1 : -1) : 0);
         this.nextHop = t + 7 + rand() * 7;
       } else if (st === 'trabalhar') {
