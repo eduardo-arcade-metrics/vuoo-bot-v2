@@ -143,22 +143,32 @@ export const VuooBot = forwardRef<HTMLCanvasElement, VuooBotProps>(function Vuoo
       drawFace(g, s.face.spec, s.face.params);
       if (s.sinceChange < 0.55) switchOn(g, s.sinceChange, s.clock);
     };
-    const onPage = l.interactive && l.orbita && s.orbit.overlay;
-    renderer.current.draw(ctx, f, dpr, s.pose, compose, s.orbit, s.confetti, s.led, pal.current, {
+    /* the atoms and the bubbles that go outside the box are drawn on the whole page, not in the bot's canvas */
+    const onPage = l.interactive && s.orbit.overlay;
+    renderer.current.draw(ctx, f, dpr, s.pose, compose, s.orbit, onPage ? [] : s.confetti, s.led, pal.current, {
       floorShadow: l.floorShadow,
       effects: l.efeitos,
       orbit: l.orbita && !onPage,
     });
-    /* the atoms that go outside the box are drawn on the whole page, not in the bot's canvas */
     if (onPage) {
       const o = s.orbit;
       const u = f.unit;
-      const at = (x: number, y: number, r: number, alpha: number): Spark => ({
-        x: hx + x * u, y: hy + y * u, r: 0.054 * u * r,
-        base: o.base, edge: o.edge, glow: o.glow, glowA: l.efeitos ? o.glowA : 0, alpha,
-      });
-      const sparks = [at(o.x, o.y, o.k, o.behind ? 0.6 : 1)];
-      for (const q of o.sats) sparks.push(at(q.x, q.y, o.k * q.k, q.z < 0 ? 0.6 : 1));
+      const sparks: Spark[] = [];
+      if (l.orbita) {
+        const at = (x: number, y: number, r: number, alpha: number): Spark => ({
+          x: hx + x * u, y: hy + y * u, r: 0.054 * u * r,
+          base: o.base, edge: o.edge, glow: o.glow, glowA: l.efeitos ? o.glowA : 0, alpha,
+        });
+        sparks.push(at(o.x, o.y, o.k, o.behind ? 0.6 : 1));
+        for (const q of o.sats) sparks.push(at(q.x, q.y, o.k * q.k, q.z < 0 ? 0.6 : 1));
+      }
+      /* the bubbles of "Euforia": flat colour, no glow */
+      for (const q of s.confetti) {
+        sparks.push({
+          x: hx + q.x * u, y: hy + q.y * u, r: Math.max(1.5, q.r * u),
+          base: q.c, edge: q.c, glow: q.c, glowA: 0, alpha: Math.min(1, q.life * 1.5),
+        });
+      }
       setLayer(reactId, sparks);
     } else clearLayer(reactId);
   };

@@ -34,6 +34,10 @@ const RING_TILT = 0.9;
 const EXPANDED = 2.6;
 /* leaving a ring: the atoms fly back before the next state's start */
 const EXIT = 0.6;
+/* the atom's race in "Euforia" crosses the whole screen: half-widths in head units */
+const EUFORIA_RING = { x: 2.6, y: 1.5 };
+/* the states whose light takes its own colour; every other state's light is the atom's */
+const LIGHT_BY_STATE: VuooState[] = ['erro', 'acerto', 'descansar', 'recuar'];
 /* the states whose atoms go round the head; their atoms draw on the page layer */
 const RINGED: VuooState[] = ['orbita', 'orbitaExpandida', 'chamarFaiscas'];
 /* the states that move like the idle, with their atoms on top of it */
@@ -195,6 +199,8 @@ export class VuooSim {
   private exitT = 0;
   /* a ring's own clock starts this long after the one it replaces */
   private entryDelay = 0;
+  /* where the atom was when the state changed: a state that moves it starts from there */
+  private enterFrom = { x: 0, y: 0 };
   /* the atoms trail the head a little, as if held by a magnet: a light spring follows the head's sideways and vertical moves */
   private lagX = new Spring();
   private lagY = new Spring();
@@ -258,6 +264,7 @@ export class VuooSim {
     this.nextBurst = 0;
     /* the old ring's atoms are not carried into the new state: the orbit restarts, and leaving a ring goes back first */
     this.orbitRun = null;
+    this.enterFrom = { x: this.orbit.x, y: this.orbit.y };
     const wasRinged = RINGED.includes(left);
     this.entryDelay = wasRinged ? EXIT : 0;
     this.exitT = 0;
@@ -511,8 +518,9 @@ export class VuooSim {
     if (a > 0 && st === 'orbita') glowA = 0.6 + 0.2 * Math.sin(t * 2);
     if (a > 0 && st === 'pergunta') glowA = 0.5 + 0.3 * Math.sin(t * 1.5);
 
-    const glowTarget = hex(spec.orbit.glow);
-    const baseTarget = off ? hex('#6E6862') : st === 'recuar' ? mix(atomo, [140, 133, 124], 0.5) : mix(atomo, glowTarget, 0.22);
+    const ownLight = LIGHT_BY_STATE.includes(st);
+    const glowTarget = ownLight ? hex(spec.orbit.glow) : atomo;
+    const baseTarget = off ? hex('#6E6862') : st === 'recuar' ? mix(atomo, [140, 133, 124], 0.5) : ownLight ? mix(atomo, glowTarget, 0.22) : atomo;
     if (!this.atomCol) {
       this.atomCol = baseTarget;
       this.glowCol = glowTarget;
@@ -527,7 +535,7 @@ export class VuooSim {
       k: p.scale,
       behind: st === 'celebrar' && a === 1 && Math.sin(t * 3) < 0,
       sats: this.orbit.sats,
-      overlay: RINGED.includes(st) || this.exitFrom !== null,
+      overlay: RINGED.includes(st) || st === 'euforia' || this.exitFrom !== null,
       glow: this.glowCol,
       glowA,
       base: this.atomCol,
@@ -645,9 +653,11 @@ export class VuooSim {
     if (this.state === 'euforia' && a === 1) {
       /* the atom races round the head, fast, at a tilt */
       const th = this.sinceChange * 4.2;
-      const ry = Math.sin(th) * 0.6;
-      this.orbit.x = Math.cos(th) * 0.95;
-      this.orbit.y = ry * Math.cos(RING_TILT);
+      const ry = Math.sin(th) * EUFORIA_RING.y;
+      /* it glides from where it was onto its race, rather than appearing on it */
+      const g = easeInOut(clamp(this.sinceChange / EXIT, 0, 1));
+      this.orbit.x = this.enterFrom.x + (Math.cos(th) * EUFORIA_RING.x - this.enterFrom.x) * g;
+      this.orbit.y = this.enterFrom.y + (ry * Math.cos(RING_TILT) - this.enterFrom.y) * g;
       this.orbit.behind = ry * Math.sin(RING_TILT) < 0;
       this.orbit.sats = [];
       this.orbitRun = null;

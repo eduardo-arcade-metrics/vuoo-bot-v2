@@ -100,7 +100,14 @@ function Swatches({ name, value, onChange }: { name: keyof Colors; value: string
 type Theme = 'dark' | 'light';
 
 function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'));
+  /* light unless the visitor has chosen dark before */
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      return localStorage.getItem('vuoo-bot-theme') === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
